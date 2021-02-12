@@ -1,6 +1,6 @@
 import {Proto} from "./Node.js"
 import Node from "./Node.js"
-import {Icons,Inline,Page} from "./BaseGUI.js"
+import {Icons,Inline,Page,e} from "./BaseGUI.js"
 //#region localStorage
 Proto.set(Storage,{
     get(name){
@@ -27,14 +27,38 @@ Proto.set(IDBFactory,{
         return new Promise((ok)=>{
             const req = indexedDB.open(name,1)
             req.onsuccess = ()=>{
-                ok(new Node(name,this,req.result))
+                ok(req.result)
             }
         })
         
     }
 })
 Proto.set(IDBDatabase,{
-    async getChilds(){
+    getChilds(){
         return Object.keys(this.target.objectStoreNames)
-    }    
+    },
+    add(name,val){
+        console.log(this)
+    },    
+})
+Proto.set(Promise,{
+    async constructor(){
+        this.target = await this.target
+        const clone = new Node(this.name,this.parent,this.target)
+        this.parent[this.name] = clone
+        this.emit('changed')
+    },
+    async get(name){
+        const val = await this.target;
+        this.target = val;
+        return null
+    }
+})
+Inline.set(Promise,function(){
+    const temp = e('span',{},['wait'])
+    this.target.then((val)=>{
+        console.log(val)
+        this.target = val
+        this.parent.emit('childChanged',this.name)
+    })
 })

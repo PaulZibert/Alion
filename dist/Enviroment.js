@@ -11,6 +11,13 @@ export const WindowBrowser = {
         if(this.el){this.el.replaceWith(page);}
         this.el = page;
         if(save){history.pushState(null,node.name,node.path)}
+        if(node.parent){
+            node.parent.on('childChanged',this.el,(name)=>{
+                if(name==node.name){
+                    this.open(node.parent.getChild(name),false)
+                }
+            })
+        }
         page.addEventListener('go',(e)=>{this.open(e.detail)})
     },
     init(){

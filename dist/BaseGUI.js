@@ -183,8 +183,8 @@ function PageObject(){
         const ev = new CustomEvent('go',{bubbles:true,detail:node.getChild(this.textContent)})
         this.dispatchEvent(ev)
     }
-    async function getAttr(attr){
-        const child = await node.getChild(attr)
+    function getAttr(attr){
+        const child = node.getChild(attr)
         const name = e('span',{onclick:goToChild},[attr])
         const icon = e(ico,{
             onclick(ev){
@@ -195,7 +195,7 @@ function PageObject(){
             },
             oncontextmenu(ev){
                 ev.preventDefault()
-                MouseNode.target.set(child)
+                MouseNode.set(child)
             }
         },child.find(Icons))
         const props = {
@@ -222,7 +222,7 @@ function PageObject(){
         const $attrs = []
         const attrs = await this.getChilds()
         for(const attr of attrs){
-            $attrs.push(await getAttr(attr))
+            $attrs.push(getAttr(attr))
         }
         $attrsRoot = e('div',{},$attrs)
         return $attrsRoot

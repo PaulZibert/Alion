@@ -89,7 +89,7 @@ export default class Node{
     getChilds(){
         return Object.getOwnPropertyNames(this.target)
     }
-    getChild(name,...nextNames){
+    getChild(name){
         if(this.childs.hasOwnProperty(name)){
             const savedNode = this.childs[name]
             if(Primitives.includes(typeof savedNode.target)){
@@ -98,18 +98,8 @@ export default class Node{
             return savedNode
         }
         const childNode = new Node(name,this,this.get(name))
-        const asyncChain = async ()=>{
-            await childNode.target
-            if(nextNames){
-                return await childNode.getChild(...nextNames)
-            }else{return childNode}
-        }
         this.childs[name] = childNode
-        if(childNode.target instanceof Promise){
-            return asyncChain()
-        }else{
-            return childNode;
-        }
+        return childNode;
     }
     set(val,caller){
         this.target = val;
