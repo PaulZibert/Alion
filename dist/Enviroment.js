@@ -1,6 +1,7 @@
-import {e,Page,ico,vport,borderStyle,Icons,MouseNode} from "./BaseGUI.js"
+import {e,Page,ico,vport,borderStyle,Icons,MouseBuferView} from "./BaseGUI.js"
 import css from "./StyleManager.js" 
-import Node from "./Node.js"
+import Node,{MouseBufer, mouseBufer} from "./Node.js"
+import {EventEmitter}from "./Node.js"
 export const WindowBrowser = {
     el:null,
     node:new Node('node'),
@@ -24,7 +25,8 @@ export const WindowBrowser = {
         if(this.el){return this.el}
         this.open(Node.fromPath(decodeURI(location.pathname)))
         window.addEventListener('popstate',async ()=>{
-            this.open(await Node.fromPath(decodeURI(location.pathname)),false)
+            const node = await Node.fromPath(decodeURI(location.pathname))
+            this.open(node,false)// TODO push states
         })
         return this.el
     }
@@ -57,12 +59,12 @@ function ToolBar(node){
             ondrop(ev){
                 const path = ev.dataTransfer.getData('node')
                 const node = Node.fromPath(path)
-                node.del();
+                node.parent?.deleteChild(node.name)
             },
             onclick(){
-                if(MouseNode.target){MouseNode.set(null);return}
-                if(confirm(`delete ${node.target.path}`)){
-                    node.target.del()
+                if(mouseBufer.input){mouseBufer.setInput('');return}
+                if(node.parent&&confirm(`delete ${node.target.path}`)){
+                    node.parent.deleteChild(node.name)
                 }
             }
         })
@@ -76,7 +78,7 @@ css['.tool-bar'] = {fontSize:30,
 css['.right-side'] = {float:"right"}
 export default function env(){
     const sideBrowser = new Browser()
-    const Bufer = MouseNode.el
+    const Bufer = MouseBuferView(mouseBufer)
     // setup topnav
     const path = e('div',{style:{width:"100%",marginLeft:5}})
     const backBtn = e('button',{onclick(){sideBrowser.back()},class:"sqr-btn"},['b'])
@@ -92,3 +94,4 @@ css['.env'] = {display:"flex",flexDirection:"column",height:"100%",maxWidth:800,
 css['.env main'] = {display:"flex",height:"100%"}
 css['.env main>*'] = {width:"100%"}
 css['.env main>.sidepage'] = Object.assign({marginLeft:5},css['.object-page'])
+

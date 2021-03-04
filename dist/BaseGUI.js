@@ -1,4 +1,4 @@
-import Node from "./Node.js"
+import Node, { EventEmitter,mouseBufer,MouseBufer } from "./Node.js"
 import css from "./StyleManager.js"
 export const Page = new Map()
 export const Inline = new Map()
@@ -32,8 +32,8 @@ function config(el,_,props){
         }
     }
 }
-function NodeConfig(el,name,props,args){
-    if(this instanceof Node){
+function EventConfig(el,name,props,args){
+    if(this instanceof EventEmitter){
         if(props.nodeEvents){
             const evts = props.nodeEvents;
             delete props.nodeEvents;
@@ -42,24 +42,28 @@ function NodeConfig(el,name,props,args){
             }
         }else if(typeof name =="function"){
             this.on('changed',el,()=>{
-                el.replaceWith(this.e(name,props,args))
+                el.replaceWith(e(name,{this:this,...props},args))
             })
         }
     }
 }
+const AwaitViewNode = new Node('await',null,null)
 /**@param {String} name @returns {HTMLElement}
 @param {HTMLElement} props
 */
 export function e(name,props={},...args){
     /**@type {HTMLElement} */
     var el;
+    var _this = this
+    if(props.this){_this = props.this;delete props.this}
     if(typeof name == "function"){
-        el = name.apply(this,args)
-        if(el instanceof Promise){
-            const tempEl = e('smpan',{},['loading...'])
+        el = name.apply(_this,args)
+        if(el instanceof Promise){// TODO delete this tile
+            AwaitViewNode.target = el
+            const tempEl = AwaitViewNode.find(Page)
             el.then((asyncEl)=>{
                 for(const fn of e.configs){
-                    fn.apply(this,[asyncEl,name,props,args])
+                    fn.apply(_this,[asyncEl,name,props,args])
                 }
                 tempEl.replaceWith(asyncEl)
             })
@@ -79,11 +83,11 @@ export function e(name,props={},...args){
         }
     }
     for(const fn of e.configs){
-        fn.apply(this,[el,name,props,args])
+        fn.apply(_this,[el,name,props,args])
     }
     return el
 }
-e.configs = [NodeConfig,config]
+e.configs = [EventConfig,config]
 Node.prototype.e = e;
 export function vport(els){
     const subEl = Array.isArray(els)?e('div',{},els):els
@@ -99,21 +103,23 @@ css['.ico-box'] = {display:"inline",paddingLeft:"1.16em"}
 css['.ico'] = {width:"100%",height:"100%"}
 //#endregion
 //#region mouse Manager
-export const MouseNode = new Node('mouseNode')
-function MouseView(){
-    const el = e('div',{class:"mouse-bufer"})
-    function getInline(){
-        el.style.display = MouseNode.target?null:"none"
-        return MouseNode.target?.find(Inline)
+export function MouseBuferView(mb){
+    const mouseEl = e('div',{class:"mouse-bufer"})
+    function contentView(){
+        const selected = this.selected
+        var node = this.node
+        mouseEl.style.display = selected?null:"none"
+        if(!selected||!node){return e('span')}
+        const name = e('header',{},[this.input,e('span',{},selected.sufix)])
+        const inline = node.find(Inline)
+        return e('div',{},[name,inline])
     }
     window.addEventListener('mousemove',function(ev){
-        el.style.left = ev.x+10
-        el.style.top = ev.y+10
+        mouseEl.style.left = ev.x+10
+        mouseEl.style.top = ev.y+10
     })
-    e(el,{},[MouseNode.e(getInline)])
-    return el
+    return e(mouseEl,{},[e(contentView,{this:mb})])
 }
-MouseNode.el = MouseView()
 css['.mouse-bufer'] = {
     position:"fixed",
     backgroundColor:"white",
@@ -122,16 +128,9 @@ css['.mouse-bufer'] = {
     border:borderStyle,
     whiteSpace:"nowrap"
 }
-addEventListener('keydown',(ev)=>{
-    const isINPUT = ["INPUT","TEXTAREA"].includes(ev.target.tagName.toUpperCase())
-    const isEDITABLE = ev.target.hasAttribute('contenteditable')
-    if(isINPUT||isEDITABLE){return}
-    if(!MouseNode.target){
-        MouseNode.set(new Node('fastCreated',null,""))
-    }
-    const editableEl = MouseNode.el.querySelector('[contenteditable],input')
-    if(editableEl){editableEl.focus()}
-})
+css['.mouse-bufer>div>header']={fontWeight:"bold",fontSize:12}
+css['.mouse-bufer>div>header>span']={opacity:0.5}
+//window.mouse = MouseNode
 //#endregion
 //#region object
 Icons.set(Object,'/icons/object.svg')
@@ -148,11 +147,11 @@ function SearchLine(){
     this.on('changed',$inp,filter)
     const addBtn = e('div',{style:{marginLeft:5},class:"sqr-btn",
         onmouseup:(ev)=>{
-            const attr = $inp.value||MouseNode.target?.name
-            const val = MouseNode.target?.target
-            if(attr){
-                MouseNode.set(null)
-                this.add(attr,val)
+            const mNode = mouseBufer.node
+            if(mNode){
+                const name = $inp.value||mNode.name
+                mouseBufer.setInput('')
+                this.add(name,mNode.target)
             }
         },
         ondragover(e){e.preventDefault()},
@@ -188,14 +187,15 @@ function PageObject(){
         const name = e('span',{onclick:goToChild},[attr])
         const icon = e(ico,{
             onclick(ev){
-                if(MouseNode.target){
-                    node.setChild(attr,MouseNode.target)
-                    MouseNode.set(null)
+                const mouseNode = mouseBufer.node
+                if(mouseNode){
+                    node.setChild(attr,mouseNode)
+                    mouseBufer.setInput('')
                 }
             },
             oncontextmenu(ev){
                 ev.preventDefault()
-                MouseNode.set(child)
+                mouseBufer.setInput(child.path)
             }
         },child.find(Icons))
         const props = {
@@ -228,7 +228,7 @@ function PageObject(){
         return $attrsRoot
     }
     this.on('childChanged',$el,async (name)=>{
-        const newEl = await getAttr(name)
+        const newEl = getAttr(name)
         for(const el of $attrsRoot.children){
             if(el.name==name){
                 if(newEl){
@@ -310,6 +310,13 @@ Page.set(String,function(){
 css['.str-inline'] = {fontSize:"1em"}
 Icons.set(String,'/icons/string.svg')
 Inline.set(String,InlineString)
+MouseBufer.handlers.push((m)=>{
+    m.variants.push({
+        sufix:"",
+        order:3,
+        value:m.input
+    })
+})
 //#endregion
 //#region number
 function InlineNumber(){
@@ -339,6 +346,17 @@ function InlineNumber(){
 }
 Icons.set(Number,'/icons/number.svg')
 Inline.set(Number,InlineNumber)
+MouseBufer.handlers.push((m)=>{
+    const number = parseFloat(m.input)
+    const isNum = m.input.match(/^\d+\.?\d*$/)
+    if(isNum){
+        m.variants.push({
+            sufix:"",
+            order:4,
+            value:number
+        })
+    }
+})
 //#endregion
 //#region func
 function InlineFunc(){
@@ -347,7 +365,7 @@ function InlineFunc(){
         onclick(){
             const caller = node.parent.target
             const result = node.target.apply(caller)
-            MouseNode.set(new Node('fnResult',null,result))
+            mouseBufer.setValue(result,'function Result')
         }
     },['r'])
     return e('span',{},[`${this.target.name}(${this.target.length})`,btn])
