@@ -47,6 +47,10 @@ export class MouseBufer extends EventEmitter{
     index = 0
     setInput(val){this.input = val;this.changed();this.index=0}
     setValue(value,name){this.input = name||"";this.variants.push({value});this.emit('changed',this,this)}
+    getValue(){
+        const val = this.selected?.value
+        return val instanceof Node?val.target:val
+    }
     get selected(){
         if(!this.variants)return
         this.index = Math.max(0,Math.min(this.index,this.variants.length-1))
@@ -90,6 +94,8 @@ export class MouseBufer extends EventEmitter{
             else if(ev.key=="Tab"){
                 if(this.input)
                 this.setInput(this.input+this.selected.sufix||'');
+            }else if(ev.key=="Delete"){
+                this.setInput('')
             }else{console.log(ev.key)}
         })
     }
@@ -176,10 +182,10 @@ export default class Node extends EventEmitter{
         return this.target[name]
     }
     getChilds(){
-        return Object.getOwnPropertyNames(this.target)
+        return [...Object.getOwnPropertyNames(this.target),'__proto__']
     }
     getChild(name){
-        if(this.childs.hasOwnProperty(name)){
+        if(Object.hasOwnProperty.apply(this.childs,[name])){
             const savedNode = this.childs[name]
             if(Primitives.includes(typeof savedNode.target)){
                 const updatedVal = this.get(name)

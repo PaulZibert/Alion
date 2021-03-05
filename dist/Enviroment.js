@@ -1,6 +1,6 @@
-import {e,Page,ico,vport,borderStyle,Icons,MouseBuferView} from "./BaseGUI.js"
+import {e,Page,ico,vport,borderStyle,Icons,Inline} from "./BaseGUI.js"
 import css from "./StyleManager.js" 
-import Node,{MouseBufer, mouseBufer} from "./Node.js"
+import Node,{ mouseBufer} from "./Node.js"
 import {EventEmitter}from "./Node.js"
 export const WindowBrowser = {
     el:null,
@@ -48,6 +48,33 @@ export class Browser{
         if(node){this.open(node,false)}
     }
 }
+function MouseBuferView(mb){
+    const mouseEl = e('div',{class:"mouse-bufer"})
+    function contentView(){
+        const selected = this.selected
+        var node = this.node
+        mouseEl.style.display = selected?null:"none"
+        if(!selected||!node){return e('span')}
+        const name = e('header',{},[this.input,e('span',{},selected.sufix)])
+        const inline = node.find(Inline)
+        return e('div',{},[name,inline])
+    }
+    window.addEventListener('mousemove',function(ev){
+        mouseEl.style.left = ev.x+10
+        mouseEl.style.top = ev.y+10
+    })
+    return e(mouseEl,{},[e(contentView,{this:mb})])
+}
+css['.mouse-bufer'] = {
+    position:"fixed",
+    backgroundColor:"white",
+    zIndex:10,
+    padding:5,
+    border:borderStyle,
+    whiteSpace:"nowrap"
+}
+css['.mouse-bufer>div>header']={fontWeight:"bold",fontSize:12}
+css['.mouse-bufer>div>header>span']={opacity:0.5}
 function ToolBar(node){
     function nodeInfo(){return e('span',{},[
         e(ico,{style:{marginRight:5}},this.target.find(Icons)),
@@ -69,9 +96,9 @@ function ToolBar(node){
             }
         })
     ])
-    return e('div',{class:"tool-bar"},[node.e(nodeInfo),tools])
+    return e('div',{class:"top-bar"},[node.e(nodeInfo),tools])
 }
-css['.tool-bar'] = {fontSize:30,
+css['.top-bar'] = {fontSize:30,
     borderBottom:borderStyle,
     marginBottom:4,
 }

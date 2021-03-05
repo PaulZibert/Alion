@@ -4,13 +4,13 @@ import {Icons,Inline,Page,e} from "./BaseGUI.js"
 //#region localStorage
 Proto.set(Storage,{
     get(name){
-        if(name!="length"){
+        if(name!="length"&&name!='__proto__'){
             try{
                 return JSON.parse(this.target[name])
             }catch(er){
                 return this.target[name]
             }
-        }
+        }else{return this.target[name]}
     },
     changed(child){
         if(!child)return

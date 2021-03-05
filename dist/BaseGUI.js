@@ -3,6 +3,9 @@ import css from "./StyleManager.js"
 export const Page = new Map()
 export const Inline = new Map()
 export const Icons = new Map()
+export const Block = new Map()
+export const ToolButtons = new Map()
+Block.canBeFn = true
 export const borderStyle = "solid 2px black"
 //#region utils
 function config(el,_,props){
@@ -102,36 +105,6 @@ export function ico(path){
 css['.ico-box'] = {display:"inline",paddingLeft:"1.16em"}
 css['.ico'] = {width:"100%",height:"100%"}
 //#endregion
-//#region mouse Manager
-export function MouseBuferView(mb){
-    const mouseEl = e('div',{class:"mouse-bufer"})
-    function contentView(){
-        const selected = this.selected
-        var node = this.node
-        mouseEl.style.display = selected?null:"none"
-        if(!selected||!node){return e('span')}
-        const name = e('header',{},[this.input,e('span',{},selected.sufix)])
-        const inline = node.find(Inline)
-        return e('div',{},[name,inline])
-    }
-    window.addEventListener('mousemove',function(ev){
-        mouseEl.style.left = ev.x+10
-        mouseEl.style.top = ev.y+10
-    })
-    return e(mouseEl,{},[e(contentView,{this:mb})])
-}
-css['.mouse-bufer'] = {
-    position:"fixed",
-    backgroundColor:"white",
-    zIndex:10,
-    padding:5,
-    border:borderStyle,
-    whiteSpace:"nowrap"
-}
-css['.mouse-bufer>div>header']={fontWeight:"bold",fontSize:12}
-css['.mouse-bufer>div>header>span']={opacity:0.5}
-//window.mouse = MouseNode
-//#endregion
 //#region object
 Icons.set(Object,'/icons/object.svg')
 function SearchLine(){
@@ -148,10 +121,11 @@ function SearchLine(){
     const addBtn = e('div',{style:{marginLeft:5},class:"sqr-btn",
         onmouseup:(ev)=>{
             const mNode = mouseBufer.node
-            if(mNode){
-                const name = $inp.value||mNode.name
+            const name = $inp.value||mNode?.name
+            const val = mNode?.target
+            if(name){
                 mouseBufer.setInput('')
-                this.add(name,mNode.target)
+                this.add(name,val)
             }
         },
         ondragover(e){e.preventDefault()},
@@ -173,88 +147,138 @@ function SearchLine(){
 css['.tool-line'] = {display:"flex",marginBottom:5}
 css['.tool-line>*'] = {border:borderStyle,fontSize:"1em"}
 css['.tool-line>.sqr-btn'] = {width:"1.3em",textAlign:"center"}
-function PageObject(){
-    const node = this
-    const $el = e('div')
-    if(!this.target){return "null"}
-    // create attrs
-    function goToChild(){
-        const ev = new CustomEvent('go',{bubbles:true,detail:node.getChild(this.textContent)})
-        this.dispatchEvent(ev)
+const foldingBtn = {
+    ico:"ᐊ",
+    /**@param {HTMLElement} line,@param {HTMLElement} btn */
+    click(btn,line){
+        if(!line.hasSubView){
+            const blockFn = this.find(Block)
+            const $block = this.e(blockFn,{style:{borderRight:"5px solid #333",}})
+            line.after($block)
+            line.expanded = true
+            line.hasSubView = true
+        }else{line.expanded = !line.expanded}
+
+        line.nextSibling.style.display = line.expanded?null:"none"
+        btn.textContent = line.expanded?"ᐁ":"ᐊ"
     }
-    function getAttr(attr){
-        const child = node.getChild(attr)
-        const name = e('span',{onclick:goToChild},[attr])
-        const icon = e(ico,{
-            onclick(ev){
-                const mouseNode = mouseBufer.node
-                if(mouseNode){
-                    node.setChild(attr,mouseNode)
-                    mouseBufer.setInput('')
-                }
+} 
+function AttrLineView(node,attr,showName=true){
+    const child = node.getChild(attr)
+    const nameProps = {
+        attr:{title:attr},
+        onclick(){
+            const ev = new CustomEvent('go',{bubbles:true,detail:child})
+            this.dispatchEvent(ev)
+        },
+        oncontextmenu(ev){
+            if(mouseBufer.input){
+                node.setChild(attr,mouseBufer.node)
+                mouseBufer.setInput('')
+            }else{mouseBufer.setInput(child.path)}
+            ev.preventDefault()
+        }
+    }
+    //#region toolbar
+    const $toolBtns = []
+    const toolBtns = [...(child.find(ToolButtons)||[]),foldingBtn]
+    for(const btn of toolBtns){
+        $toolBtns.push(e('div',{
+            onclick(){btn.click.apply(child,[this,this.parentNode.parentNode])},
+            ...(btn.config||{})
+        },btn.ico))
+    }
+    const toolBar = e('div',{class:"tool-bar"},$toolBtns)   
+    //#endregion
+    const name = e('span',nameProps,[showName?attr+' : ':""])
+    const icon = e(ico,nameProps,child.find(Icons))
+    const lineProps = {
+        class:"attr",
+        name:attr,
+        attr:{draggable:true},
+        events:{
+            dragstart(e){
+                e.dataTransfer.setData('node',child.path)
             },
-            oncontextmenu(ev){
-                ev.preventDefault()
-                mouseBufer.setInput(child.path)
-            }
-        },child.find(Icons))
-        const props = {
-            class:"attr",
-            name:attr,
-            attr:{draggable:true},
-            events:{
-                dragstart(e){
-                    e.dataTransfer.setData('node',child.path)
-                },
-                drop(e){
-                    const path  = e.dataTransfer.getData('node')
-                    const dragNode = Node.fromPath(path)
-                    node.setChild(attr,dragNode)
-                },
-                dragover(e){e.preventDefault()}
-            }
+            drop(e){
+                const path  = e.dataTransfer.getData('node')
+                const dragNode = Node.fromPath(path)
+                node.setChild(attr,dragNode)
+            },
+            dragover(e){e.preventDefault()}
         }
-        return e('div',props,[icon,name,' : ',child])
     }
-    /**@type {HTMLElement} */
-    var $attrsRoot 
-    async function genAttrs(){
-        const $attrs = []
-        const attrs = await this.getChilds()
-        for(const attr of attrs){
-            $attrs.push(getAttr(attr))
-        }
-        $attrsRoot = e('div',{},$attrs)
-        return $attrsRoot
+    return e('div',lineProps,[icon,name,child,toolBar])
+}
+css['.attr'] = {
+    padding:3,
+    borderBottom:borderStyle,
+    lineHeight:"25px",
+    whiteSpace:"nowrap",
+    overflowX:"hidden",
+    position:"relative",
+}
+css['.attr>.tool-bar'] = {position:"absolute",
+    right:0,top:0,bottom:0,fontWeight:"bold"
     }
-    this.on('childChanged',$el,async (name)=>{
-        const newEl = getAttr(name)
-        for(const el of $attrsRoot.children){
+    css['.attr>.tool-bar>*'] = {
+        color:"white",
+        backgroundColor:"black",
+        height:"100%",
+        width:30,
+        display:"inline-block",
+        textAlign:"center",
+        lineHeight:"30px"
+    }
+css['.attr>.ico-box'] = {marginRight:3}
+function addChangeEvents(node,$el){
+    node.on('childChanged',$el,async (name)=>{
+        const newEl = AttrLineView(node,name)
+        for(const el of $el.children){
             if(el.name==name){
                 if(newEl){
                     el.replaceWith(newEl)
                 }else{
-                    $attrsRoot.removeChild(el)
+                    $el.removeChild(el)
                 }
                 return
             }
         }
-        $attrsRoot.append(newEl)
+        $el.append(newEl)
     })
-    this.on('childRemoved',$el,(name)=>{
+    node.on('childRemoved',$el,(name)=>{
         for(const el of $attrsRoot.children){
             if(el.name==name){$attrsRoot.removeChild(el)}}
     })
+}
+async function BlockObject(){
+    const $attrs = []
+    const attrs = await this.getChilds()
+    for(const attr of attrs){
+        $attrs.push(AttrLineView(this,attr))
+    }
+    const $el = e('div',{},$attrs)
+    addChangeEvents(this,$el)
+    return $el
+        
+}
+function PageObject(){
+    const node = this
+    const $el = e('div')
+    if(!this.target){return "null"}
+    /**@type {HTMLElement} */
+    const blockFn = this.find(Block)
     return e($el,{class:"object-page"},[
         this.e(SearchLine),
-        e(vport,{class:'attrs'},this.e(genAttrs))
+        e(vport,{class:'attrs'},this.e(blockFn))
     ])
     
 }
 function InlineObject(){
-    if(this.target==null){return e('div',{},["null"])}
+    if(this.target==null){return e('span',{},["null"])}
     return e('span',{},[`Object {${Object.getOwnPropertyNames(this.target).length}}`])
 }
+
 css['.object-page'] = {
     height:"100%",
     display:"flex",
@@ -263,18 +287,12 @@ css['.object-page'] = {
 }
 css['.object-page>.attrs'] = {
     height:"100%",
-    border:borderStyle,
+    border:borderStyle
 }
-css['.object-page .attr'] = {
-    padding:3,
-    borderBottom:borderStyle,
-    lineHeight:"25px",
-    whiteSpace:"nowrap"
-}
-css['.object-page .attr>.ico-box'] = {marginRight:3}
 
 Page.set(Object,PageObject)
 Inline.set(Object,InlineObject)
+Block.set(Object,BlockObject)
 //#endregion
 //#region string
 function InlineString(){
@@ -332,20 +350,14 @@ function InlineNumber(){
         if(caller==$ret)return
         num.textContent = `${this.target}`
     })
-    function onclick(){
-        if(this.textContent=="+"){
-            node.set(node.target+1,$ret);
-        }else{
-            node.set(node.target-1,$ret);
-        }
-        num.textContent = `${node.target}`
-    }
-    const plus = e('button',{onclick},['+'])
-    const minus = e('button',{onclick},['-'])
-    return e($ret,{},[plus,' ',num,' ',minus])
+    return e($ret,{},[num])
 }
 Icons.set(Number,'/icons/number.svg')
 Inline.set(Number,InlineNumber)
+ToolButtons.set(Number,[
+    {ico:"-",click(){this.set(this.target-1)}},
+    {ico:"+",click(){this.set(this.target+1)}},
+])
 MouseBufer.handlers.push((m)=>{
     const number = parseFloat(m.input)
     const isNum = m.input.match(/^\d+\.?\d*$/)
@@ -360,18 +372,17 @@ MouseBufer.handlers.push((m)=>{
 //#endregion
 //#region func
 function InlineFunc(){
-    const node = this
-    const btn = e('button',{
-        onclick(){
-            const caller = node.parent.target
-            const result = node.target.apply(caller)
-            mouseBufer.setValue(result,'function Result')
-        }
-    },['r'])
-    return e('span',{},[`${this.target.name}(${this.target.length})`,btn])
+    return e('span',{},[`${this.target.name}(${this.target.length})`])
 }
 Icons.set(Function,function(){return "/icons/"+(this.target.prototype?"class.svg":"function.svg")})
 Inline.set(Function,InlineFunc)
+ToolButtons.set(Function,[
+    {ico:"▶",click(){
+        const caller = this.parent.target
+        const result = this.target.apply(caller,[mouseBufer.getValue()])
+        mouseBufer.setValue(result,'function Result')
+    }},
+])
 //#endregion
 //#region bool
 Icons.set(Boolean,'/icons/boolean.svg')
@@ -395,6 +406,15 @@ Inline.set(Array,function(){
         els.push(this.getChild(i).find(Inline))
     }
     return e('div',{class:"arr-inline"},els)
+})
+Block.set(Array,function BlockArray(){
+    const $items = []
+    for(const i in this.target){
+        $items.push(AttrLineView(this,i,false))
+    }
+    const $el = e('div',{},$items)
+    addChangeEvents(this,$el)
+    return $el
 })
 css['.arr-inline'] = {display:"inline"}
 css['.arr-inline>*'] = {
