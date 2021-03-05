@@ -153,7 +153,9 @@ const foldingBtn = {
     click(btn,line){
         if(!line.hasSubView){
             const blockFn = this.find(Block)
-            const $block = this.e(blockFn,{style:{borderRight:"5px solid #333",}})
+            const $block = this.e(blockFn,{
+                style:{borderRight:"2px solid #333",borderLeft:"4px solid black"}
+            })
             line.after($block)
             line.expanded = true
             line.hasSubView = true
@@ -247,8 +249,8 @@ function addChangeEvents(node,$el){
         $el.append(newEl)
     })
     node.on('childRemoved',$el,(name)=>{
-        for(const el of $attrsRoot.children){
-            if(el.name==name){$attrsRoot.removeChild(el)}}
+        for(const el of $el.children){
+            if(el.name==name){$el.removeChild(el)}}
     })
 }
 async function BlockObject(){
